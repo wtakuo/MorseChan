@@ -1,5 +1,10 @@
-// robot.cpp - StackChan hardware: M5StackChan library (servos, RGB LEDs, head
-// touch) and M5Stack-Avatar (face).
+// robot.cpp - robot hardware: M5Stack-Avatar (face) on both supported setups,
+// and either
+//   - the StackChan body: M5StackChan library (servos, 12 RGB LEDs, head
+//     touch), or
+//   - no body (e.g. CoreS3 SE + Base M5GO Bottom3): 10 WS2812 LEDs on G5
+//     driven by M5Unified's LED strip driver; no head motion
+// The setup is detected at run time (begin()), so one firmware runs on both.
 //
 // APIs used (checked in the installed libraries):
 //   M5StackChan.begin() / update()                    (M5StackChan 1.1.1)
@@ -13,6 +18,7 @@
 #include <Arduino.h>
 #include <Avatar.h>
 #include <M5StackChan.h>
+#include <utility/led/LED_Strip_Class.hpp>
 #include <math.h>
 #include <string.h>
 #include "config.h"
@@ -34,6 +40,10 @@ extern TaskHandle_t drawTaskHandle;
 
 namespace robot {
 namespace {
+
+// ---- Hardware setup (decided in begin()) ----
+bool hasBody = false;  // StackChan body: servos, body LEDs, head touch
+const char* boardName = "?";
 
 // ---- Overlay layer ----
 // The extra marks (?, !, ..., sparkles, Zzz), the status lines and the
@@ -236,6 +246,8 @@ void drawMenu(M5Canvas* s, const Settings& set, int sel) {
         s->setTextDatum(middle_left);
         s->drawString(label((Item)i), 12, y + ROW_H / 2);
         valueText(set, (Item)i, val, sizeof(val));
+        if ((Item)i == Item::Motion && !hasBody)
+            snprintf(val, sizeof(val), "NO BODY");
         s->setTextDatum(middle_right);
         s->drawString(val, SCREEN_W - 14, y + ROW_H / 2);
     }
@@ -358,7 +370,7 @@ void stepGesture(uint32_t now) {
         return;
     }
     const bot::Keyframe& k = gdef.frames[gIndex++];
-    if (motionLevel > 0) {
+    if (hasBody && motionLevel > 0) {
         bot::Pose p = bot::keyframePose(k, motionLevel);
         int speed =
             k.speed < cfg::SERVO_SPEED_MAX ? k.speed : cfg::SERVO_SPEED_MAX;
@@ -377,7 +389,12 @@ void writeRgb(uint8_t r, uint8_t g, uint8_t b) {
     uint32_t v = ((uint32_t)r << 16) | ((uint32_t)g << 8) | b;
     if (v == lastRgb) return;
     lastRgb = v;
-    M5StackChan.showRgbColor(r, g, b);
+    if (hasBody) {
+        M5StackChan.showRgbColor(r, g, b);
+    } else {
+        M5.Led.setAllColor(r, g, b);
+        M5.Led.display();
+    }
 }
 
 void updateLeds(uint32_t now, bool txKey, bool rxKey) {
@@ -423,14 +440,61 @@ void updateLeds(uint32_t now, bool txKey, bool rxKey) {
     writeRgb(scale(r, lv), scale(g, lv), scale(b, lv));
 }
 
+// Is the StackChan body attached? M5GFX reports board_M5StackChan when the
+// body's IO expander (I2C 0x6F) answered during its board detection. That
+// expander may boot slowly (M5StackChan waits up to 1.2 s for it), so a CoreS3
+// is probed again for a while. A CoreS3 SE has no camera and is never a
+// StackChan
+bool detectBody() {
+    auto b = M5.getBoard();
+    if (b == m5::board_t::board_M5StackChan) return true;
+    if (b != m5::board_t::board_M5StackCoreS3) return false;
+    uint32_t t0 = millis();
+    do {
+        if (M5.In_I2C.scanID(cfg::STACKCHAN_IOE_ADDR)) return true;
+        delay(100);
+    } while (millis() - t0 < cfg::BODY_DETECT_MS);
+    return false;
+}
+
+// LEDs without the body: Base M5GO Bottom3 (10 x WS2812 on G5, confirmed on
+// the hardware). Harmless if no such base is attached
+void beginBottomLeds() {
+    auto bus = std::make_shared<m5::LedBus_RMT>();
+    auto bc = bus->config();
+    bc.pin_data = cfg::BOTTOM_LED_PIN;
+    bus->config(bc);
+    auto strip = std::make_shared<m5::LED_Strip_Class>();
+    auto sc = strip->config();
+    sc.led_count = cfg::BOTTOM_LED_COUNT;
+    strip->config(sc);
+    strip->setBus(bus);
+    M5.Led.setLedInstance(strip);
+    M5.Led.setAutoDisplay(false);
+    M5.Led.begin();
+    M5.Led.setBrightness(255);  // levels are scaled in updateLeds()
+}
+
 }  // namespace
 
 bool begin() {
-    M5StackChan.begin();
-    // Smooth, continuous keyframe motion (as in the library's Dance example)
-    M5StackChan.Motion.setAutoAngleSyncEnabled(false);
-    bot::Pose rest = bot::restPose();
-    M5StackChan.Motion.move(rest.yaw, rest.pitch, cfg::REST_SPEED);
+    // M5.begin() runs only once, so M5StackChan.begin() below does not
+    // initialize M5Unified again
+    M5.begin();
+    hasBody = detectBody();
+    if (hasBody) {
+        boardName = "StackChan";
+        M5StackChan.begin();
+        // Smooth, continuous keyframe motion (as in the Dance example)
+        M5StackChan.Motion.setAutoAngleSyncEnabled(false);
+        bot::Pose rest = bot::restPose();
+        M5StackChan.Motion.move(rest.yaw, rest.pitch, cfg::REST_SPEED);
+    } else {
+        boardName = M5.getBoard() == m5::board_t::board_M5StackCoreS3SE
+                        ? "CoreS3 SE (no body)"
+                        : "CoreS3 (no body)";
+        beginBottomLeds();
+    }
 
     // The default face, with the overlay wrapped around the (invisible) left
     // eyebrow. Positions are those of m5avatar::Face::Face()
@@ -454,7 +518,7 @@ bool begin() {
 }
 
 void moveRest() {
-    if (motionLevel == 0) return;
+    if (!hasBody || motionLevel == 0) return;
     bot::Pose rest = bot::restPose();
     M5StackChan.Motion.move(rest.yaw, rest.pitch, cfg::REST_SPEED);
 }
@@ -499,8 +563,12 @@ void react(const bot::Reaction& r, uint32_t now) {
 }
 
 void update(uint32_t now, bool txKey, bool rxKey, bool idle) {
-    M5StackChan.update();
-    if (M5StackChan.TouchSensor.wasClicked()) headTap = true;
+    if (hasBody) {
+        M5StackChan.update();  // M5.update() + head touch sensor
+        if (M5StackChan.TouchSensor.wasClicked()) headTap = true;
+    } else {
+        M5.update();
+    }
     // Raw touch state -> our own tap / swipe classification
     bool pressed = false;
     int tx = 0, ty = 0;
@@ -609,7 +677,7 @@ void setDozing(bool on, uint32_t now) {
         avatar->setRotation(0);
         dozingNow = true;
         led(Led::Idle, now);
-        if (motionLevel > 0) {
+        if (hasBody && motionLevel > 0) {
             bot::Pose p = bot::dozePose();
             M5StackChan.Motion.move(p.yaw, p.pitch, cfg::DOZE_SPEED);
         }
@@ -661,13 +729,19 @@ void dumpLayer() {
 }
 
 void printBattery() {
-    Serial.printf(
-        "M5.Power: level=%ld%% voltage=%dmV charging=%d vbus=%dmV | "
-        "StackChan INA226: voltage=%.3fV current=%.3fA\r\n",
-        (long)M5.Power.getBatteryLevel(), M5.Power.getBatteryVoltage(),
-        (int)M5.Power.isCharging(), M5.Power.getVBUSVoltage(),
-        M5StackChan.getBatteryVoltage(), M5StackChan.getBatteryCurrent());
+    Serial.printf("M5.Power: level=%ld%% voltage=%dmV charging=%d vbus=%dmV",
+                  (long)M5.Power.getBatteryLevel(),
+                  M5.Power.getBatteryVoltage(), (int)M5.Power.isCharging(),
+                  M5.Power.getVBUSVoltage());
+    if (hasBody)
+        Serial.printf(" | StackChan INA226: voltage=%.3fV current=%.3fA",
+                      M5StackChan.getBatteryVoltage(),
+                      M5StackChan.getBatteryCurrent());
+    Serial.print("\r\n");
 }
+
+const char* board() { return boardName; }
+bool body() { return hasBody; }
 
 uint32_t drawStackFree() {
     return m5avatar::drawTaskHandle

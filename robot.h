@@ -21,7 +21,13 @@ struct Status {
     char lastWord[24] = {};  // last recognized message
 };
 
+// Detects the hardware (StackChan body or not; see robot.cpp) and starts the
+// face, servos and LEDs
 bool begin();
+// Detected hardware: name for messages, and whether the StackChan body
+// (servos, body LEDs, head touch) is attached
+const char* board();
+bool body();
 // Face + gesture + LEDs. A reaction gesture replaces a running one
 void react(const bot::Reaction& r, uint32_t nowMs);
 void setEmotion(bot::Emotion e, uint32_t nowMs);

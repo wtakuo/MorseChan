@@ -137,7 +137,18 @@ constexpr uint32_t MENU_GUARD_MS = 500;
 constexpr uint32_t MENU_TIMEOUT_MS = 30000;  // closes (and saves) when idle
 constexpr uint32_t PREVIEW_MS = 150;  // beep when the volume / tone changes
 
-// ---- RGB LED (12 LEDs) ----
+// ---- Hardware detection / LEDs without the StackChan body ----
+// I2C address of the StackChan body's IO expander (M5StackChan's PY32
+// expander; also what M5GFX checks to report board_M5StackChan)
+constexpr uint8_t STACKCHAN_IOE_ADDR = 0x6F;
+// How long a CoreS3 is probed for the (slowly booting) expander
+constexpr uint32_t BODY_DETECT_MS = 1500;
+// Base M5GO Bottom3 LEDs (10 x WS2812, GRB). G5 confirmed on the hardware
+// (CoreS3 SE + Bottom3); bus pin 9 "RGB" of the docs is not G35 (LCD D/C)
+constexpr int BOTTOM_LED_PIN = 5;
+constexpr int BOTTOM_LED_COUNT = 10;
+
+// ---- RGB LED (StackChan: 12 LEDs; Bottom3: 10) ----
 constexpr uint8_t LED_LEVEL_DEFAULT = 2;  // brightness 0..3 (0 = off)
 constexpr uint32_t LED_REACTION_MS = 3000;
 constexpr uint32_t LED_ALERT_BLINK_MS = 200;

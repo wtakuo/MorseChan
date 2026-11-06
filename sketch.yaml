@@ -1,15 +1,36 @@
 # Build profile for MorseChan (arduino-cli 1.x)
 # https://docs.arduino.cc/arduino-cli/sketch-project-file/
 #
-# Usage:
+# Usage (use a separate build directory per profile):
 #   arduino-cli compile --profile stackchan --build-path build/stackchan \
 #       -u -p /dev/cu.usbmodemXXXX .
+#   arduino-cli compile --profile cores3 --build-path build/cores3 \
+#       -u -p /dev/cu.usbmodemXXXX .
+# Both profiles build the same firmware: it detects at run time whether the
+# StackChan body is attached. The profiles document the targets.
 # The versions are those used when this project was built and tested.
 profiles:
   stackchan:
     notes: >-
       M5Stack StackChan (K151, CoreS3 / ESP32-S3, 16MB flash, 8MB PSRAM).
       Talks with MorseComm over ESP-NOW
+    fqbn: m5stack:esp32:m5stack_cores3
+    platforms:
+      - platform: m5stack:esp32 (3.3.10)
+        platform_index_url: https://static-cdn.m5stack.com/resource/arduino/package_m5stack_index.json
+    libraries:
+      - M5StackChan (1.1.1)
+      - M5Stack_Avatar (0.10.0)
+      - M5Unified (0.2.29)
+      - M5GFX (0.2.36)
+      - IRremoteESP8266 (2.9.0)
+      - M5Unit-NFC (0.1.2)
+
+  cores3:
+    notes: >-
+      M5Stack CoreS3 SE (or CoreS3) without the StackChan body, e.g. with the
+      Base M5GO Bottom3 (10 x WS2812 on G5, 500mAh battery). Face, LEDs and
+      sound; no head motion
     fqbn: m5stack:esp32:m5stack_cores3
     platforms:
       - platform: m5stack:esp32 (3.3.10)

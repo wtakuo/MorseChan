@@ -2,4 +2,4 @@
 // Shown in the serial startup message and by show.
 #pragma once
 
-#define VERSION "0.2.1"
+#define VERSION "0.3.0"

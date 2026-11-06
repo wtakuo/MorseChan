@@ -2,6 +2,19 @@
 
 日本語: [CHANGELOG.ja.md](CHANGELOG.ja.md)
 
+## 0.3.0 (2026-11-06)
+
+- Runs also on a CoreS3 SE without the StackChan body, e.g. with the Base
+  M5GO Bottom3: face, sound and the bottom's 10 WS2812 LEDs (G5); no head
+  motion. One firmware for both: the body is detected at start-up
+- New build profile `cores3` in sketch.yaml
+- The settings screen shows `NO BODY` for MOTION without the body
+- README: use a separate channel for each MorseChan (two on one channel keep
+  answering each other)
+- README: the USB drops during fast head motions happen with the cable in the
+  StackChan's foot connector, not in the CoreS3's own USB port (tested); the
+  servo speed cap of 500 is kept
+
 ## 0.2.1 (2026-11-06)
 
 - Settings changed on the settings screen are saved to NVS immediately

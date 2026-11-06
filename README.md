@@ -10,6 +10,9 @@ ESP-NOW and reacts with its face, head movements and LEDs.
   station
 - Rule-based dialog, no generative AI, no Internet
 - Tolerant recognition (`HEL LO` -> HELLO, `HOWAREYOU` -> HOW ARE YOU, ...)
+- **Also runs on a CoreS3 SE without the robot body (+ Base M5GO Bottom3)**:
+  face, LEDs and sound, no head motion. The same firmware detects the body at
+  start-up (see "Supported hardware")
 
 日本語: [README.ja.md](README.ja.md) / Changes: [CHANGELOG.md](CHANGELOG.md)
 
@@ -25,9 +28,30 @@ ESP-NOW and reacts with its face, head movements and LEDs.
 | M5Unified / M5GFX | 0.2.29 / 0.2.36 |
 | Peer MorseComm | 0.1.0 (tested with a Nesso N1) |
 
+## Supported hardware
+
+| | StackChan (K151) | CoreS3 SE + Base M5GO Bottom3 |
+|---|---|---|
+| Detected (at start-up) | M5Unified reports StackChan / CoreS3 and the body's IO expander (I2C 0x6F) answers | M5Unified reports CoreS3 SE (no body) |
+| Head motion | servos (M5StackChan) | none (head tilt = face tilt only) |
+| LEDs | 12 in the body (M5StackChan) | 10 WS2812 in the bottom on **G5** (M5Unified LED driver) |
+| Head touch | yes | no |
+| Face, sound, radio, dialog, settings screen, dozing, battery | yes | yes (the bottom's 500mAh battery, read by the CoreS3 PMIC) |
+
+The start-up message and `show` print the result (`StackChan` / `CoreS3 SE
+(no body)`); without the body the MOTION item of the settings screen reads
+`NO BODY`. The Bottom3 LED pin could not be determined from the docs (bus pin
+9 "RGB" is G35 = LCD D/C on the CoreS3) and was **confirmed as G5 on the
+hardware**. A plain CoreS3 without the body should work the same way (the
+body check takes about 1.5 s; not tested).
+
 ## Build and upload
 
-The `stackchan` profile in `sketch.yaml` pins the versions above.
+`sketch.yaml` has two profiles pinning the versions above: `stackchan` and
+`cores3` (CoreS3 SE / CoreS3 without the body). They build the same firmware
+(arduino-cli profiles cannot carry build options, so the hardware is detected
+at run time); separate profiles keep separate build directories and name the
+target.
 
 ```sh
 # Once: add the board package URL and install
@@ -41,6 +65,8 @@ arduino-cli lib install M5StackChan@1.1.1 M5Stack_Avatar@0.10.0 \
 arduino-cli board list   # StackChan shows up as /dev/cu.usbmodem*
 arduino-cli compile --profile stackchan --build-path build/stackchan \
     -u -p /dev/cu.usbmodemXXXX .
+arduino-cli compile --profile cores3 --build-path build/cores3 \
+    -u -p /dev/cu.usbmodemXXXX .      # CoreS3 SE (+ M5GO Bottom3)
 
 # Or with the FQBN directly
 arduino-cli compile -b m5stack:esp32:m5stack_cores3 --build-path build/stackchan .
@@ -117,6 +143,13 @@ slowly breathing blue. When a MorseComm appears on the channel (powered on,
 or switched to it) StackChan wakes up with a start (`!`, the head pops up,
 then a smile). A tap on the head also wakes it. No look-arounds and no
 call-outs while nobody is on the channel.
+
+### Two MorseChans
+
+Two MorseChans on the same channel (e.g. the StackChan and a CoreS3 SE) hear
+each other's replies and keep answering each other (the MorseComm protocol
+cannot tell a MorseChan from a visitor). **Give each MorseChan its own
+channel** (CHANNEL on the settings screen).
 
 ### Settings on the device (no PC needed)
 
@@ -262,6 +295,15 @@ mode to key text without changing its saved settings. See README.ja.md
 
 ## Hardware verification status
 
+0.3.0 (2026-11-06, CoreS3 SE + Base M5GO Bottom3 and a Nesso N1 with
+MorseComm 0.1.0, desk): detected as `CoreS3 SE (no body)`, battery readable;
+the bottom LEDs on G5 show red / green / blue correctly (user-checked with a
+test sketch); dialog with the Nesso (HEL LO, YES, unknown word, SOS, 73) with
+the replies shown on MorseComm; dozing and waking; draw task free stack 196
+bytes. Not yet checked: faces, LED colors, volume and the settings screen on
+the CoreS3 SE by eye, and **0.3.0 on the StackChan** (body detection, head
+motion, body LEDs).
+
 0.2.1 (2026-11-06): settings are saved to NVS on every change (before, only
 on DONE or after 30 s); ◀ ▶ buttons; battery level (M5.Power, which reads the
 StackChan body battery; matches the INA226 reading) in the title line. New
@@ -292,6 +334,13 @@ current limit is also possible; not confirmed). A servo speed cap
 (`SERVO_SPEED_MAX` = 500 in `config.h`) reduced it to 1 in 40 gestures. On a
 USB charger (as planned for the exhibition) it does not matter. Replug the USB
 cable if the serial port stops answering.
+
+Cause narrowed down (0.3.0): this happened with the USB cable in the
+StackChan's **foot (body) connector**. Plugged into the **CoreS3's own USB
+port**, 40 fast gestures with the cap and 70 without it (speed 1000) caused no
+drop. The body's USB wiring runs near the servos and picks up their current
+peaks. **For development, plug into the CoreS3's USB port.** The cap of 500
+stays, as the motions were checked by eye with it.
 
 0.1.0 (2026-11-06, 1 StackChan + 1 Nesso N1 with MorseComm 0.1.0, desk):
 

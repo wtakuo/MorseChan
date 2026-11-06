@@ -8,6 +8,8 @@ ESP-NOW でモールス符号のやりとりをして、表情・首の動き・
 - StackChan の返事は MorseComm の通常の受信として音が鳴り、画面に復号表示されます
 - 対話は生成 AI を使わないルールベース (インターネット不要)
 - 打ち間違いに強い認識 (`HEL LO` → HELLO、`HOWAREYOU` → HOW ARE YOU など)
+- **胴体のない CoreS3 SE (+ Base M5GO Bottom3) でも動きます** (表情・LED・音。首は動かない)。
+  同じファームウェアが起動時に StackChan の胴体の有無を判別します (下の「対応ハードウェア」)
 
 English: [README.md](README.md)　変更履歴: [CHANGELOG.ja.md](CHANGELOG.ja.md)
 
@@ -23,9 +25,28 @@ English: [README.md](README.md)　変更履歴: [CHANGELOG.ja.md](CHANGELOG.ja.m
 | M5Unified / M5GFX | 0.2.29 / 0.2.36 |
 | 相手の MorseComm | 0.1.0 (Nesso N1 で確認) |
 
+## 対応ハードウェア
+
+| | StackChan (K151) | CoreS3 SE + Base M5GO Bottom3 |
+|---|---|---|
+| 判別 (起動時) | M5Unified が StackChan / CoreS3 と判定し、胴体の IO エキスパンダ (I2C 0x6F) が応答 | M5Unified が CoreS3 SE と判定 (胴体なし) |
+| 首の動き | サーボ (M5StackChan) | なし (首をかしげる動作は顔の傾きだけ) |
+| LED | 胴体の 12 個 (M5StackChan) | ボトムの WS2812 10 個、**G5** (M5Unified の LED ドライバ) |
+| 頭のタッチ | あり | なし |
+| 顔・音・通信・対話・設定画面・居眠り・電池表示 | あり | あり (電池はボトムの 500mAh を CoreS3 の電源 IC で読む) |
+
+- 起動メッセージと `show` に判別結果が出ます (`StackChan` / `CoreS3 SE (no body)`)。
+  胴体がないとき、設定画面の MOTION は `NO BODY` と表示されます
+- Bottom3 の LED のピンは資料 (M5-Bus の 9 番 "RGB") からは決められず (CoreS3 では 9 番は G35 = 画面の D/C)、
+  **実機で G5 であることを確認**しました。Bottom3 が付いていない CoreS3 SE でも動作に支障はありません
+- 胴体のない普通の CoreS3 でも、胴体の判別に約 1.5 秒かかるだけで同じように動きます (未確認)
+
 ## ビルドと書き込み
 
-`sketch.yaml` のプロファイル `stackchan` に上記のバージョンを固定してあります。
+`sketch.yaml` に上記のバージョンを固定したプロファイルが 2 つあります: `stackchan` (StackChan) と
+`cores3` (胴体のない CoreS3 SE / CoreS3)。中身は同じファームウェアで、ビルドディレクトリを分けるためと
+対象を明示するために分けています (arduino-cli のプロファイルにはビルドオプションを持たせられないので、
+機種の違いは実行時に判別しています)。
 
 ```sh
 # 初回のみ: ボードパッケージの URL を登録してインストール
@@ -39,8 +60,11 @@ arduino-cli lib install M5StackChan@1.1.1 M5Stack_Avatar@0.10.0 \
 # ポートの確認 (StackChan は /dev/cu.usbmodem* として見える)
 arduino-cli board list
 
-# ビルドして書き込み
+# ビルドして書き込み (StackChan)
 arduino-cli compile --profile stackchan --build-path build/stackchan \
+    -u -p /dev/cu.usbmodemXXXX .
+# CoreS3 SE (+ M5GO Bottom3)
+arduino-cli compile --profile cores3 --build-path build/cores3 \
     -u -p /dev/cu.usbmodemXXXX .
 
 # FQBN を直接指定する場合
@@ -128,6 +152,12 @@ DOZE 秒 (既定 30 秒) 続くと居眠りします: 目を閉じて `Z z z`、
 (`!` と首がぴょこっと上がる → 笑顔)。頭のタッチでも起きます。
 居眠り中は見回しと呼びかけをしません (チャンネルにだれもいないときは呼びかけない)。
 MorseComm は電池運用で 3 分操作がないとスリープするので、その場合も StackChan は居眠りします。
+
+### MorseChan を 2 台使うとき
+
+同じチャンネルに MorseChan が 2 台 (例: StackChan と CoreS3 SE) いると、お互いの返事を受信して返事をし合い、
+会話が続いてしまいます (MorseComm のプロトコルには MorseChan どうしを見分ける情報がない)。
+**MorseChan ごとに別のチャンネルにしてください** (設定画面の CHANNEL)。
 
 ### 本体での設定 (PC なしで変更できる)
 
@@ -253,6 +283,7 @@ tone_out.h tone_out_m5speaker.cpp                                  トーン出�
 assembler.h            受信文字をメッセージにまとめる (無音で確定)            ※
 recognizer.h           正規化と定型句の照合                                 ※
 dialog_rules.h         対話データ (定型句・返事・質問)                        ※
+board.h                対象ボードの確認 (CoreS3 系)。StackChan かどうかは robot.cpp が実行時に判別
 settings_menu.h        本体の設定画面 (項目、値の変え方、タッチの配置)          ※
 touch_gesture.h        画面のタッチをタップ / 上スワイプに分類                  ※
 dialog.h               対話の状態機械 (Idle/Receiving/Responding/Asking/WaitingForAnswer) ※
@@ -308,6 +339,18 @@ MorseComm を載せた機器 (例: Nesso N1) と StackChan を Mac につなぎ�
 
 ## 実機での確認状況
 
+### 0.3.0 (2026-11-06, CoreS3 SE + Base M5GO Bottom3 1 台 + Nesso N1 (MorseComm 0.1.0) 1 台, 机上)
+
+確認済み:
+- M5Unified が CoreS3 SE と判定し、胴体なしで起動 (`CoreS3 SE (no body)`)。電池 (ボトムの電池) を読める
+- ボトムの LED を G5 で駆動して赤・緑・青が正しく光ることをユーザーが確認 (試験用スケッチ)
+- Nesso との対話: `HEL LO` → `HELLO` と `ENJOY?`、YES → `GOOD!`、未知語 → `WHAT?`、SOS → `HELP?`、73 → `73`。
+  MorseComm の画面に返事が表示された。居眠り (局がいない) と目覚め (局が現れる)
+- 描画タスクの残りスタックは 196 バイト (StackChan と同じ)
+
+未確認: CoreS3 SE での表情・LED の色 (MorseChan として)・音量・設定画面の見た目とスワイプ (目視待ち)、
+**0.3.0 を StackChan に書き込んでの再確認** (胴体の判別、首の動き、胴体の LED)
+
 ### 0.2.0 (2026-11-06): 本体の設定画面、返事のバリエーション、居眠り
 
 確認済み (シリアルのログ):
@@ -343,6 +386,11 @@ PC (Mac) の USB につないだまま首を速く動かすと、**USB シリア
 対策としてサーボ速度に上限 (`config.h` の `SERVO_SPEED_MAX` = 500) を設け、40 回で 1 回に減りました
 (上限なしでは最初の速い動作で発生)。展示では USB 充電器から給電するので影響はありません。
 USB シリアルが応答しなくなったら USB を抜き差ししてください。
+
+**原因の切り分け (0.3.0 の確認時):** 上記は USB ケーブルを StackChan の**足元 (胴体) のコネクタ**につないだときの現象。
+**CoreS3 本体の USB ポート**につなぐと、速度の上限 (500) ありで 40 回、上限なし (1000) でも 70 回の速い動作で一度も
+切れなかった。胴体側の USB の配線がサーボの近くを通るため、サーボの電流の影響を受けると考えられます。
+**開発時は CoreS3 の USB ポートにつなぐのがおすすめ**です。速度の上限 500 は、見た目を確認済みの今の動きとして残しています。
 
 ### 0.1.0 (2026-11-06, StackChan 1 台 + Nesso N1 (MorseComm 0.1.0) 1 台, 机上)
 

@@ -23,12 +23,13 @@
 
 ## 3. 環境
 
-- FQBN `m5stack:esp32:m5stack_cores3` (m5stack:esp32 3.3.10)。`esp32:esp32:m5stack_cores3` もあるが使っていない
+- FQBN `m5stack:esp32:m5stack_cores3` (m5stack:esp32 3.3.10)。`esp32:esp32:m5stack_cores3` もあるが使っていない。
+  StackChan も CoreS3 SE も同じ FQBN。プロファイルは stackchan / cores3 (中身は同じ、ビルドディレクトリを分ける)
 - ライブラリ: M5StackChan 1.1.1 / M5Stack_Avatar 0.10.0 / M5Unified 0.2.29 / M5GFX 0.2.36 (sketch.yaml の profile stackchan)
-- 実機: StackChan 1 台と、MorseComm 入りの Nesso N1 1 台を Mac につないで試験する。どちらも /dev/cu.usbmodem* として見え、
+- 実機: StackChan 1 台、CoreS3 SE + M5GO Bottom3 1 台と、MorseComm 入りの Nesso N1 1 台を Mac につないで試験する。いずれも /dev/cu.usbmodem* として見え、
   ポート名は接続のたびに変わりうるので `arduino-cli board list` と `show` (MorseChan / MorseComm の起動メッセージ) で見分ける
-- Nesso の設定 (2026-11-06 の show): ESP-NOW ch1 STRAIGHT 20WPM side 700Hz rx 600Hz vol3。
-  **Nesso の保存設定は変えない**。試験は MorseComm の `term` モード (Ctrl-C で終了) でシリアルから文字を送る
+- Nesso の設定 (2026-11-06 の show): ESP-NOW STRAIGHT 20WPM side 700Hz rx 600Hz vol3。チャンネルはユーザーが変える
+  (ch1 → ch2) ので、試験前に Nesso の `show` で確認して MorseChan 側を合わせる。**Nesso の保存設定は変えない**。試験は MorseComm の `term` モード (Ctrl-C で終了) でシリアルから文字を送る
 - 2 台同時の試験スクリプトはセッションの scratchpad に duo.py として作った (リポジトリには入れていない)。
   Python で両ポートを raw 115200 で開き、Nesso に "term\r" と文字を書き、両方の出力を時刻付きで表示する
 - StackChan のシリアル (USB CDC) はポートを開いたときに再起動することがある
@@ -67,6 +68,28 @@
 - ホストテストは時刻を引数で渡して決定的に動かす
 
 ## 7. 作業状況 (2026-11-06)
+
+### 0.3.0 (ユーザー要望, 2026-11-06): CoreS3 SE + Base M5GO Bottom3 への移植
+- 胴体のない CoreS3 SE (+ M5GO Bottom3)。同じ FQBN (m5stack_cores3) なのでコンパイル時には区別できず、arduino-cli の
+  プロファイルは build_properties を持てない (試したら黙って無視された) → **実行時に判別** (robot.cpp の detectBody)。
+  M5.begin() は 2 回目以降何もしないので、先に M5.begin() → 判別 → 胴体ありなら M5StackChan.begin()。
+  判別: M5.getBoard() が board_M5StackChan (M5GFX が 0x6F の IO エキスパンダを見て判定) なら胴体あり、CoreS3 なら
+  0x6F を最大 1.5 秒 scanID (エキスパンダの起動が遅いことがある)、CoreS3 SE (カメラなし) なら胴体なし
+- 胴体なし: M5StackChan の関数は一切呼ばない (hasBody で分岐)。LED は M5Unified の LED_Strip_Class + LedBus_RMT
+  (`<utility/led/LED_Strip_Class.hpp>` を別に include) で M5.Led に設定、10 個、GRB。サーボの動きは省略 (顔の傾きは残す)
+- **Bottom3 の LED は G5** (試験用スケッチで赤緑青をユーザーが確認)。資料の M5-Bus 9 番 "RGB" は CoreS3 では G35 (LCD の
+  D/C と共有) なので使わないこと。電池はボトムの電池を M5.Power (AXP2101) で読める (4.165V)
+- 実機 (CoreS3 SE + Nesso) で対話・居眠りを確認。CoreS3 SE での表情・LED・音量・設定画面はユーザーが確認済み
+- StackChan に 0.3.0 を書いて確認: "StackChan" と判別、INA226 も読める、保存済みの設定 (CH2, doze 60) は残った
+- **USB が切れる問題の原因を切り分け (ユーザーの気づき):** それまで USB は StackChan の足元 (胴体) のコネクタにつないでいた。
+  CoreS3 本体の USB ポートにつなぐと、上限 500 で 40 回・上限なし (1000, scratchpad にコピーしたスケッチでビルド) で 70 回の
+  速い動作で切断 0。→ 胴体側の USB 配線がサーボの電流の影響を受けていた。SERVO_SPEED_MAX = 500 はユーザーの判断でそのまま。
+  開発時は CoreS3 の USB ポートにつなぐ
+- 注意: 未コミットの変更があるときに `git checkout <file>` で一時的な編集を戻そうとしないこと (他の未コミットの変更まで消える。
+  自動モードでも拒否された)。一時的な試験はスケッチを scratchpad にコピーして行う
+- 注意: 同じチャンネルに MorseChan が 2 台いると返事をし合う。ユーザーの判断で「別チャンネル運用」(README に注意を記載)。
+  試験中に StackChan (CH2) と Nesso (CH2) が同じチャンネルにいたことがある → 試験前に `stats` の stations を確認する
+- Nesso はユーザーが CH2 に変えていた (2026-11-06 の時点)。Nesso の設定は変えずに、MorseChan 側のチャンネルを合わせて試験した
 
 ### 0.2.0 (ユーザー要望, 2026-11-06)
 - 本体の設定画面 (当初は長押し、のちに下からのスワイプで開く。settings_menu.h、描画は robot.cpp の drawMenu)。展示では来場者どうしが

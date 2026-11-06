@@ -255,7 +255,7 @@ void handleLine(char* line) {
     } else if (!strcmp(line, "show")) {
         uint8_t mac[6];
         net::ownMac(mac);
-        Serial.printf("MorseChan %s on %s, MAC ", VERSION, board::NAME);
+        Serial.printf("MorseChan %s on %s, MAC ", VERSION, robot::board());
         printMac(mac);
         Serial.printf(
             "\r\nuptime=%lus reset=%s heap=%lu draw_stack_free=%lu\r\n",
@@ -565,7 +565,8 @@ void setup() {
     Serial.setTxBufferSize(SERIAL_TX_BUFFER);
     Serial.begin(115200);
     Serial.setTxTimeoutMs(0);
-    robot::begin();  // M5StackChan.begin() (M5.begin), face, servos, LEDs
+    // M5.begin(), detects the StackChan body, face, servos / LEDs
+    robot::begin();
     prefs.begin(PREF_NS, false);
     loadSettings();
     bool ok = engine::begin();
@@ -576,7 +577,7 @@ void setup() {
     applyLocal(getSettings());
     uint8_t mac[6];
     net::ownMac(mac);
-    Serial.printf("MorseChan start (%s): MAC ", board::NAME);
+    Serial.printf("MorseChan start (%s): MAC ", robot::board());
     printMac(mac);
     Serial.printf(" espnow=%s version=%s\r\n", ok ? "ok" : "FAILED", VERSION);
     printSettings();
