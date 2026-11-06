@@ -2,6 +2,11 @@
 
 日本語: [CHANGELOG.ja.md](CHANGELOG.ja.md)
 
+## 0.3.1 (2026-11-06)
+
+- Start-up splash screen for 3 s: "MorseChan", the initials M C in Morse
+  code, the version and the author (radio and dialog already run under it)
+
 ## 0.3.0 (2026-11-06)
 
 - Runs also on a CoreS3 SE without the StackChan body, e.g. with the Base

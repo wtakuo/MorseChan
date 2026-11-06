@@ -2,6 +2,11 @@
 
 English: [CHANGELOG.md](CHANGELOG.md)
 
+## 0.3.1 (2026-11-06)
+
+- 起動時 (リセット時) に 3 秒間スプラッシュスクリーンを表示: "MorseChan"、頭文字 M C のモールス符号、
+  バージョン、作者。表示中も通信・対話は動いている
+
 ## 0.3.0 (2026-11-06)
 
 - StackChan の胴体がない CoreS3 SE (Base M5GO Bottom3 付きなど) でも動くようにした: 表情・音・ボトムの LED

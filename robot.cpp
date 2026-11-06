@@ -64,6 +64,7 @@ bool frontReplace = false;  // copy instead of OR (settings screen)
 Status ovStatus;
 bool ovStatusOn = false;
 bool ovMenuOn = false;
+uint32_t ovSplashUntil = 0;  // splash screen shown until (0 = not shown)
 Settings ovMenuSet;
 int ovMenuSel = 0;
 bool ovDirty = true;
@@ -257,6 +258,37 @@ void drawMenu(M5Canvas* s, const Settings& set, int sel) {
     drawButton(s, BTN_DONE_X, "DONE");
 }
 
+// Morse code bars for a code like "--" (dit 8 px, dah 24 px, 6 px apart),
+// starting at x. Returns the x after the last element
+int drawMorseBars(M5Canvas* s, const char* code, int x, int y) {
+    for (const char* p = code; *p; p++) {
+        int w = *p == '-' ? 24 : 8;
+        s->fillRoundRect(x, y, w, 6, 3, 1);
+        x += w + 6;
+    }
+    return x - 6;
+}
+
+// Start-up splash screen (covers the whole face)
+void drawSplash(M5Canvas* s) {
+    const int cx = menu::SCREEN_W / 2;
+    s->setTextColor(1);
+    s->setTextDatum(middle_center);
+    s->setTextSize(1);
+    s->setFont(&fonts::FreeSansBold24pt7b);
+    s->drawString("MorseChan", cx, 70);
+    // "M C" in Morse code under the title: -- -.-.
+    const int barsW = (24 + 6 + 24) + 18 + (24 + 6 + 8 + 6 + 24 + 6 + 8);
+    int x = cx - barsW / 2;
+    x = drawMorseBars(s, "--", x, 106);
+    drawMorseBars(s, "-.-.", x + 18, 106);
+    s->setFont(&fonts::FreeSans12pt7b);
+    s->drawString("Version " VERSION, cx, 150);
+    s->setFont(&fonts::FreeSans9pt7b);
+    s->drawString("Takuo Watanabe (JM1TEU)", cx, 192);
+    s->drawString("w/ Claude", cx, 214);
+}
+
 // Redraw the layer (loop()). emotion: the mark to show
 void renderLayer(uint32_t now, Emotion emotion) {
     if (!layers[0] || !layers[1]) return;
@@ -270,6 +302,9 @@ void renderLayer(uint32_t now, Emotion emotion) {
     bool any = false, replace = false;
     if (ovMenuOn) {
         drawMenu(s, ovMenuSet, ovMenuSel);
+        any = replace = true;
+    } else if (ovSplashUntil) {
+        drawSplash(s);
         any = replace = true;
     } else {
         any = drawMark(s, emotion, now);
@@ -626,6 +661,11 @@ void update(uint32_t now, bool txKey, bool rxKey, bool idle) {
         batteryCharging = M5.Power.isCharging() == m5::Power_Class::is_charging;
     }
 
+    if (ovSplashUntil && (int32_t)(now - ovSplashUntil) >= 0) {
+        ovSplashUntil = 0;  // back to the face
+        ovDirty = true;
+    }
+
     // Redraw the overlay layer (marks animate; status lines change)
     if (ovDirty || now - ovLastMs >= OVERLAY_INTERVAL_MS) {
         renderLayer(now, shownEmotion);
@@ -741,6 +781,12 @@ void printBattery() {
 }
 
 const char* board() { return boardName; }
+
+void showSplash(uint32_t ms) {
+    uint32_t until = millis() + ms;
+    ovSplashUntil = until ? until : 1;
+    renderLayer(millis(), shownEmotion);  // show it at once
+}
 bool body() { return hasBody; }
 
 uint32_t drawStackFree() {

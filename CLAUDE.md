@@ -69,6 +69,14 @@
 
 ## 7. 作業状況 (2026-11-06)
 
+### 0.3.1 (ユーザー要望, 2026-11-06): 起動画面
+- 起動時に 3 秒 (cfg::SPLASH_MS) スプラッシュ。内容はユーザー指定: "MorseChan" / "Version x.y.z" /
+  "Takuo Watanabe (JM1TEU)" と "w/ Claude" (2 行に分けた。MorseComm と同じ)。レイアウトは任された:
+  FreeSansBold24pt のタイトル、その下に M C のモールス符号の棒 (-- -.-.)、FreeSans12pt の版、9pt の作者
+- 設定画面と同じオーバーレイレイヤー (置き換え) で loop() 側から描く (描画タスクで文字を描かない規則のため)。ユーザーが表示を確認済み。
+  優先順位は 設定画面 > スプラッシュ > 記号・状態表示。StackChan で layershot により確認、3 秒後に layer: empty
+- 0.3.0 は 22d742d でコミット済み
+
 ### 0.3.0 (ユーザー要望, 2026-11-06): CoreS3 SE + Base M5GO Bottom3 への移植
 - 胴体のない CoreS3 SE (+ M5GO Bottom3)。同じ FQBN (m5stack_cores3) なのでコンパイル時には区別できず、arduino-cli の
   プロファイルは build_properties を持てない (試したら黙って無視された) → **実行時に判別** (robot.cpp の detectBody)。

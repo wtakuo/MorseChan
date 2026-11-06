@@ -567,6 +567,7 @@ void setup() {
     Serial.setTxTimeoutMs(0);
     // M5.begin(), detects the StackChan body, face, servos / LEDs
     robot::begin();
+    robot::showSplash(cfg::SPLASH_MS);
     prefs.begin(PREF_NS, false);
     loadSettings();
     bool ok = engine::begin();

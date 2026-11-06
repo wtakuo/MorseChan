@@ -27,6 +27,8 @@ bool begin();
 // Detected hardware: name for messages, and whether the StackChan body
 // (servos, body LEDs, head touch) is attached
 const char* board();
+// Show the start-up splash screen for ms (the robot keeps running under it)
+void showSplash(uint32_t ms);
 bool body();
 // Face + gesture + LEDs. A reaction gesture replaces a running one
 void react(const bot::Reaction& r, uint32_t nowMs);

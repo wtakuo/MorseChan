@@ -135,6 +135,12 @@ The speaker plays our own keying at 700 Hz (`rxtone on` also plays received
 keying). Tap the screen to show/hide the status lines; tap the head touch
 sensor for a happy nod.
 
+### Splash screen
+
+At power-on (reset) a splash screen shows "MorseChan", the initials M C in
+Morse code, the version and the author for 3 s (`SPLASH_MS` in `config.h`).
+Radio and dialog already run underneath.
+
 ### Dozing (NO SIGNAL)
 
 When no MorseComm is heard on StackChan's channel for DOZE seconds (default

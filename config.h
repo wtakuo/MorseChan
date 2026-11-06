@@ -81,6 +81,9 @@ constexpr int MSG_MAX_LEN = 48;  // a longer message is finalized at once
 // exactly
 constexpr int FUZZY_MIN_LEN = 5;
 
+// ---- Display ----
+constexpr uint32_t SPLASH_MS = 3000;  // start-up splash screen
+
 // ---- Dialog timing ----
 // Delay between the reaction (face / motion) and the start of the reply
 constexpr uint32_t REPLY_DELAY_MS = 700;
